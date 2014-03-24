@@ -33,8 +33,13 @@
   possible to connect)"
   [uri topic data
    & {:keys [payload-coercion qos retained?]
-      :or {payload-coercion muscat/clj->ednbytes
+      :or {payload-coercion clj->ednbytes
            qos              :at-least-once
            retained?        false}}]
-  (let [qos-int ({:fire-and-forget 0 :at-least-once 1 :exactly-once 2})]
-   (publish* uri topic data qos payload-coercion retained?)))
+  (let [qos-int ({:fire-and-forget 0 :at-least-once 1 :exactly-once 2} qos)]
+   (try
+     (publish* uri topic data qos-int payload-coercion retained?)
+     true
+     (catch Exception cause
+       (println cause)
+       false))))
