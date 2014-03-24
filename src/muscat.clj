@@ -26,8 +26,15 @@
 (defn publish
   "Publish will publish to the given MQTT broker/topic the given
   data. By default the data will be coerced to a String of EDN data,
-  however this can be overridden with the :payload-coercion option"
+  however this can be overridden with the :payload-coercion option.
+
+  This will return true if the message has been delivered according to
+  the qos contract and false if it has not (if for example it is not
+  possible to connect)"
   [uri topic data
-   & {:keys [payload-coercion qos]}]
- (let [default-opts {:payload-coercion muscat/edn->bytes}])
-  )
+   & {:keys [payload-coercion qos retained?]
+      :or {payload-coercion muscat/clj->ednbytes
+           qos              :at-least-once
+           retained?        false}}]
+  (let [qos-int ({:fire-and-forget 0 :at-least-once 1 :exactly-once 2})]
+   (publish* uri topic data qos payload-coercion retained?)))
