@@ -17,29 +17,35 @@
 
   Optionally provide a :connection-lost callback"
   [uri topics callback
-   & {:keys [payload-coercion connection-lost failed-message]
-      :or {payload-coercion ednbytes->clj
+   & {:keys [coerce-payload-fn connection-lost failed-message]
+      :or {coerce-payload-fn ednbytes->clj
            failed-coercion  default-failed-fn
            connection-lost  default-connection-lost-fn}}]
-  (subscribe* uri topics callback payload-coercion connection-lost failed-message))
+  (try
+    (subscribe* uri topics callback coerce-payload-fn connection-lost failed-message)
+    {:successful? true}
+     (catch Exception cause
+       {:successful? false
+        :cause cause})))
 
 (defn publish
   "Publish will publish to the given MQTT broker/topic the given
   data. By default the data will be coerced to a String of EDN data,
-  however this can be overridden with the :payload-coercion option.
+  however this can be overridden with the :coerce-payload-fn option.
 
   This will return true if the message has been delivered according to
   the qos contract and false if it has not (if for example it is not
   possible to connect)"
   [uri topic data
-   & {:keys [payload-coercion qos retained?]
-      :or {payload-coercion clj->ednbytes
+   & {:keys [coerce-payload-fn qos retained? timeout]
+      :or {coerce-payload-fn clj->ednbytes
            qos              :at-least-once
+           timeout          30000
            retained?        false}}]
   (let [qos-int ({:fire-and-forget 0 :at-least-once 1 :exactly-once 2} qos)]
    (try
-     (publish* uri topic data qos-int payload-coercion retained?)
-     true
+     (publish* uri topic data qos-int coerce-payload-fn retained? timeout)
+     {:successful? true}
      (catch Exception cause
-       (println cause)
-       false))))
+       {:successful? false
+        :cause cause}))))

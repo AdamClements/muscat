@@ -1,5 +1,6 @@
 (ns muscat.platform
-  (:import (org.eclipse.paho.client.mqttv3 MqttCallback MqttClient)
+  (:import (org.eclipse.paho.client.mqttv3 MqttCallback MqttClient
+                                           MqttConnectOptions)
            (org.eclipse.paho.client.mqttv3.persist MemoryPersistence)))
 
 (defn subscribe* [uri topics callback payload-coercion connection-lost failed-message]
@@ -14,21 +15,28 @@
                                     (catch Exception cause (failed-message uri topic message cause))))))
                  (.connect)
                  (.subscribe (into-array topics)))]
-    (letfn [(disconnect [] (doto client (.disconnect)) connect)
-            (connect    [] (doto client (.connect) (.subscribe (into-array topics))) disconnect)]
-      disconnect)))
+    (fn [] (when (.isConnected client) (doto client (.disconnect))))))
 
-(def connection-pool
-  (memoize
-   (fn [uri]
-     (doto (MqttClient. uri (MqttClient/generateClientId) (MemoryPersistence.))
-       (.setCallback (reify MqttCallback
-                       (deliveryComplete [this token])
-                       (connectionLost   [this cause]
-                         (println "Lost connection on publisher pool " uri cause)) ;TODO fix up
-                       (messageArrived   [this topic message])))
-       (.connect)))))
+(defn fresh-connection [uri]
+  (MqttClient. uri (MqttClient/generateClientId) (MemoryPersistence.)))
 
-(defn publish* [uri topic data qos payload-coercion retained?]
-  (let [client (connection-pool uri)]
+;;; Perhaps this should reconnect existing connections, rather than
+;;; replacing them.
+(def get-or-create-connection 
+  (let [pool (atom {})]
+    (fn [uri]
+      (let [existing (@pool uri)]
+       (if existing
+         existing
+         (get (swap! pool assoc uri (fresh-connection uri)) uri))))))
+
+(defn get-connected-client [uri timeout]
+  (let [client (get-or-create-connection uri)]
+    (when-not (.isConnected client)
+      (.connect client (doto (MqttConnectOptions.)
+                         (.setConnectionTimeout timeout))))
+    client))
+
+(defn publish* [uri topic data qos payload-coercion retained? timeout]
+  (let [client (get-connected-client uri timeout)]
     (.publish client topic (payload-coercion data) qos retained?)))
