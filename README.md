@@ -2,6 +2,8 @@
 
 <img src="http://upload.wikimedia.org/wikipedia/commons/f/fb/Muscat_rouge_de_madere.jpg" align="right" width="30%"/>
 
+NOTE, THIS IS STILL IN PRODUCTION AND NOT QUITE READY FOR USE YET.
+
 Muscat is an MQTT client library for clojure and clojurescript.
 
 MQTT is a publish/subscribe protocol, therefore muscat has two
